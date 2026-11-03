@@ -29,7 +29,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.19.1</version>
+                <version>3.2.5</version>
                 <configuration>
                     <includes>
                         <include>**/*Test.java</include>
@@ -39,23 +39,8 @@
                             **/MouseHovers_3_Test.java
                         </exclude>
                     </excludes>
-                    <properties>
-                        <!-- <includeTags>fast</includeTags> -->
-                        <excludeTags>slow</excludeTags>
-                        <!--
-                        <configurationParameters>
-                            junit.jupiter.conditions.deactivate = *
-                        </configurationParameters>
-                        -->
-                    </properties>
+                    <excludedGroups>slow</excludedGroups>
                 </configuration>
-                <!--                <dependencies>-->
-                <!--                    <dependency>-->
-                <!--                        <groupId>org.junit.platform</groupId>-->
-                <!--                        <artifactId>junit-platform-surefire-provider</artifactId>-->
-                <!--                        <version>${junit.platform.version}</version>-->
-                <!--                    </dependency>-->
-                <!--                </dependencies>-->
             </plugin>
         </plugins>
     </build>
@@ -84,6 +69,12 @@
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
             <version>2.15.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
