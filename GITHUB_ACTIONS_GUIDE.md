@@ -1,6 +1,6 @@
 # Beginner's Guide: Running Selenium (Java + Maven) Tests on GitHub Actions
 
-This guide explains step-by-step how we took a local Selenium test (`Google_Test.java`) that opens Chrome on your computer and configured it to run automatically in the cloud using **GitHub Actions**.
+This guide explains step-by-step how we took a local Selenium test (`Google_Test.java`) that opens Chrome on your computer and configured it to run automatically in the cloud using **GitHub Actions**—including a visual **Test Results Summary** right at the bottom of the GitHub Actions run page.
 
 By following these steps, you can take any other Selenium test in this repository (or any other Java/Maven project) and make it ready for GitHub Actions.
 
@@ -24,7 +24,7 @@ To solve this, we made **3 changes** across the project.
 
 ## Step 1: Configure `pom.xml` So Maven Can Run JUnit 5 Tests
 
-GitHub Actions uses **Maven** (`mvn test`) to run tests. Specifically, Maven uses a plugin called `maven-surefire-plugin` to find and execute `@Test` methods.
+GitHub Actions uses **Maven** (`mvn test`) to run tests. Specifically, Maven uses a plugin called `maven-surefire-plugin` to find and execute `@Test` methods and output XML test reports into `target/surefire-reports/`.
 
 ### What Was Wrong?
 1. Older versions of `maven-surefire-plugin` (like `2.19.1`) only understood **JUnit 4** (`org.junit.Test`) and completely ignored **JUnit 5** (`org.junit.jupiter.api.Test`), resulting in `Tests run: 0`.
@@ -135,11 +135,46 @@ Then call `acceptCookiesIfPresent(driver);` right after `driver.get(...)`.
 
 ---
 
-## Step 3: Create the GitHub Actions Workflow File
+## Step 3: Create the GitHub Actions Workflow File (With a Live Results Summary Table!)
 
 GitHub Actions looks for YAML files inside the `.github/workflows/` folder at the root of your repository. We created `.github/workflows/selenium-tests.yml`.
 
-Here is the complete file and what each section does:
+### How the Bottom-of-Page Test Summary Works (`$GITHUB_STEP_SUMMARY`)
+GitHub Actions provides a special built-in environment variable called `$GITHUB_STEP_SUMMARY`. Any Markdown text written to `$GITHUB_STEP_SUMMARY` during a workflow step is automatically rendered as a clean table at the bottom of the Actions run page!
+
+When Maven finishes running your tests, `maven-surefire-plugin` creates an XML file in `target/surefire-reports/TEST-<ClassName>.xml` containing:
+- Every `@Test` method name and how long it took (`time`).
+- Any `System.out.println(...)` output (`<system-out>`).
+- Whether it passed, was skipped (`<skipped>`), failed an assertion (`<failure>`), or threw an unexpected exception (`<error>`), along with the exact failure reason and stack trace.
+
+We added a `Generate Test Summary on Actions Page` step (`if: always()`, so it runs even when tests fail!) that parses those Surefire XML files using Python and writes a Markdown summary table to `$GITHUB_STEP_SUMMARY`.
+
+Here is what gets displayed right at the bottom of your GitHub Actions run page:
+
+> ### ✅ Selenium Test Results Summary
+>
+> | Total Tests | ✅ Passed | ❌ Failed | 💥 Errors | ⏭️ Skipped | ⏱️ Total Duration |
+> | :---: | :---: | :---: | :---: | :---: | :---: |
+> | **5** | **5** | **0** | **0** | **0** | **11.75s** |
+>
+> #### 📦 `My_zAi_Runner_ClientSites_ScheduledMonthly.Google_Test` (11.75s)
+>
+> | Status | Test Method | Duration | Details / Console Output |
+> | :--- | :--- | :--- | :--- |
+> | ✅ **PASSED** | `title_test` | 2.25s | `Title: Google` |
+> | ✅ **PASSED** | `acceptCookies_test` | 2.04s | `Search element is displayed: true / Index Title: Google` |
+> | ✅ **PASSED** | `browserDetails_test` | 0.39s | `Running ChromeDriver version: 156.0.8078.74` |
+> | ✅ **PASSED** | `screenshotCheeseSearchPage_test` | 3.14s | — |
+> | ✅ **PASSED** | `SearchCheese_test` | 3.92s | — |
+
+And if any test **fails** or throws an **error**, it automatically adds an expandable **🔍 Failure & Error Details** section right underneath the table showing:
+- **Which test failed** (`❌ title_test`)
+- **Why it failed** (e.g., `org.opentest4j.AssertionFailedError: expected: <Google> but was: <...>`, or `NoSuchElementException: Unable to locate element...`)
+- **The full stack trace** showing the exact line number in your `.java` file.
+
+---
+
+### Full `.github/workflows/selenium-tests.yml` Explained
 
 ```yaml
 name: Run Selenium Tests
@@ -187,7 +222,17 @@ jobs:
           CI: 'true'
         run: mvn test -Dtest="${{ inputs.test_class }}" -Dheadless=true
 
-      # Step E: Save any screenshots (*.png) and test reports so you can download them
+      # Step E: Read target/surefire-reports/TEST-*.xml and render a visual table
+      # at the bottom of the GitHub Actions run page ($GITHUB_STEP_SUMMARY)
+      - name: Generate Test Summary on Actions Page
+        if: always()
+        run: |
+          python3 - << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          # (Parses target/surefire-reports/TEST-*.xml and prints Markdown tables
+          # showing Passed, Failed, Errors, Skipped, console output, and failure reasons)
+          EOF
+
+      # Step F: Save any screenshots (*.png) and test reports so you can download them
       # "if: always()" ensures screenshots are uploaded even if a test fails!
       - name: Upload Screenshots & Surefire Reports
         if: always()
@@ -236,16 +281,18 @@ If it passes locally in headless mode without opening a Chrome window, it is rea
 
 ---
 
-## How to Run Any Test on GitHub
+## How to Run Any Test on GitHub and View the Results
 
 1. Push your changes to GitHub (`git add .`, `git commit -m "..."`, `git push`).
 2. Open your repository on **github.com** and click the **Actions** tab at the top.
 3. In the left sidebar, click **Run Selenium Tests**.
 4. Click the **Run workflow** dropdown button on the right.
 5. In the **Test class (or pattern) to run** box, enter:
-   - A single test class with its package: `My_zAi_Runner_ClientSites_ScheduledMonthly.Google_Test`
+   - Default (`Google_Test`): `My_zAi_Runner_ClientSites_ScheduledMonthly.Google_Test`
    - Just the class name: `Google_Test`
    - A single test method inside a class: `Google_Test#title_test`
    - All tests in a package: `My_zAi_Runner_ClientSites_ScheduledMonthly.*Test`
-6. Click the green **Run workflow** button.
-7. Once the run finishes, scroll to the bottom of the workflow summary page under **Artifacts** (`test-results-and-screenshots`) to download any screenshots taken during the run!
+6. Click the green **Run workflow** button, then click on the newly started workflow run.
+7. Once it finishes, **scroll to the bottom of the workflow run summary page**:
+   - You will see the **Selenium Test Results Summary** table showing every test method, whether it **Passed / Failed / Skipped**, its duration, its `System.out.println` output, and an expandable **Failure & Error Details** box explaining why any failed test failed.
+   - Right below that, under **Artifacts** (`test-results-and-screenshots`), you can click to download any screenshots (`.png`) taken during the run!
