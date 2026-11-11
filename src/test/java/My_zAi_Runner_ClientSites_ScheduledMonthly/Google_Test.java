@@ -44,6 +44,7 @@ public class Google_Test {
         //System.setProperty("webdriver.chrome.driver", "C:\\qa\\projectShare\\resource\\chromedriver\\chromedriver.exe");
         driver = new ChromeDriver(getChromeOptions());
         driver.get("https://google.co.uk");
+        acceptCookiesIfPresent(driver);
         String title = driver.getTitle();
         System.out.println("Title: " + title);
         assertEquals(title, "Google");
